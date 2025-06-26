@@ -347,8 +347,9 @@ var viewer = new Cesium.Viewer('cesiumContainer', {
     baseLayerPicker: false,
     timeline: false,
     animation: false,
-    imageryProvider: new Cesium.OpenStreetMapImageryProvider({
-        url : 'https://a.tile.openstreetmap.org/'
+    imageryProvider: new Cesium.BingMapsImageryProvider({
+        url: 'https://dev.virtualearth.net',
+        mapStyle: Cesium.BingMapsStyle.AERIAL
     })
 });
 viewer.scene.globe.enableLighting = true;
@@ -382,7 +383,7 @@ if(features.length === 0) {
         });
     }
     viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(112.7521,-7.2575, 20000.0)
+        destination: Cesium.Cartesian3.fromDegrees(112.7521,-7.2575, 2000000.0)
     });
 }
 </script></body></html>
