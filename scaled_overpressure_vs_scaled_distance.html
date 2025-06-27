@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Scaled Overpressure vs Scaled Distance</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        .source-note { font-size: 10px; font-style: italic; text-align: center; margin-top: 12px; }
+        textarea { width: 400px; height: 100px; }
+    </style>
+</head>
+<body>
+    <h2>Scaled Overpressure vs Scaled Distance</h2>
+    <div>
+        <label for="compound">Compound Name:</label>
+        <input type="text" id="compound" value="UserSample">
+    </div>
+    <div>
+        <label for="userData">Paste User Data (ze, Ps, per baris):</label><br>
+        <textarea id="userData" placeholder="Contoh:&#10;0.1,500&#10;1.2,120&#10;8,10"></textarea>
+    </div>
+    <button onclick="drawChart()">Generate Chart</button>
+    <canvas id="overpressureChart" width="600" height="400"></canvas>
+    <div class="source-note">
+        Source: G. F. Kinney and K. J. Graham, Explosive Shocks in Air (Berlin: Springer-Verlag, 1985
+    </div>
+
+<script>
+function generateReferenceCurve(pointCount=1000) {
+    let refZe = [], refPs = [];
+    let minLog = Math.log10(0.01);
+    let maxLog = Math.log10(100);
+    for (let i = 0; i < pointCount; i++) {
+        let logZe = minLog + (maxLog - minLog) * (i) / (pointCount - 1);
+        let ze = Math.pow(10, logZe);
+        let Ps = (1616 * (1 + Math.pow(ze/4.5, 2))) /
+                 (Math.sqrt(1 + Math.pow(ze/0.048,2)) *
+                  Math.sqrt(1 + Math.pow(ze/0.32,2)) *
+                  Math.sqrt(1 + Math.pow(ze/1.35,2)));
+        refZe.push(ze);
+        refPs.push(Ps);
+    }
+    return { refZe, refPs };
+}
+
+function parseUserData(text) {
+    // Expects CSV: ze, Ps per line
+    let ze = [], Ps = [];
+    let lines = text.trim().split('\n');
+    lines.forEach(line => {
+        let parts = line.split(',').map(x => parseFloat(x.trim()));
+        if (parts.length >=2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            ze.push(parts[0]);
+            Ps.push(parts[1]);
+        }
+    });
+    return { ze, Ps };
+}
+
+function findClosestPs(ze, refZe, refPs) {
+    // Return Ps_ref yang terdekat terhadap ze_user
+    let minDiff = Infinity, closestPs = null;
+    for (let j = 0; j < refZe.length; j++) {
+        let diff = Math.abs(ze - refZe[j]);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestPs = refPs[j];
+        }
+    }
+    return closestPs;
+}
+
+let chartInstance = null;
+function drawChart() {
+    // Data
+    let compoundName = document.getElementById('compound').value || 'UserData';
+    let userText = document.getElementById('userData').value;
+    let user = parseUserData(userText);
+    let { refZe, refPs } = generateReferenceCurve();
+
+    // Data for Chart.js
+    let refData = [];
+    for (let i = 0; i < refZe.length; i++) {
+        refData.push({x: refZe[i], y: refPs[i]});
+    }
+
+    let userData = [];
+    let userPointLabels = [];
+    for (let i = 0; i < user.ze.length; i++) {
+        let zeUser = user.ze[i];
+        let psUser = user.Ps[i];
+        let psClosest = findClosestPs(zeUser, refZe, refPs);
+        let errorPercent = Math.abs(psUser - psClosest) / psClosest * 100;
+
+        // Color marker
+        let color = errorPercent <= 10 ? 'rgba(0,176,80,1)'
+                 : errorPercent <= 30 ? 'rgba(255,192,0,1)'
+                 : 'rgba(255,0,0,1)';
+        userData.push({
+            x: zeUser,
+            y: psUser,
+            backgroundColor: color,
+            borderColor: color,
+            radius: 6,
+        });
+        // Add label for tooltip
+        userPointLabels.push(
+            `ze: ${zeUser.toFixed(2)} ; Ps: ${psUser.toFixed(2)} ; Error: ${errorPercent.toFixed(1)}%`
+        );
+    }
+
+    // Remove old chart if exist
+    if (chartInstance) chartInstance.destroy();
+
+    // Create chart
+    const ctx = document.getElementById('overpressureChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: 'Reference Curve',
+                    data: refData,
+                    showLine: true,
+                    borderWidth: 2,
+                    borderColor: 'rgba(91,155,213,1)',
+                    pointRadius: 0,
+                    fill: false,
+                },
+                {
+                    label: compoundName,
+                    data: userData,
+                    pointBackgroundColor: userData.map(d=>d.backgroundColor),
+                    pointBorderColor: userData.map(d=>d.borderColor),
+                    pointRadius: userData.map(d=>d.radius),
+                    showLine: false,
+                },
+            ]
+        },
+        options: {
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Scaled Overpressure vs Scaled Distance',
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: {
+                    display: true,
+                    position: 'top',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let i = context.dataIndex;
+                            if (context.dataset.label !== 'Reference Curve')
+                                return userPointLabels[i];
+                            let x = context.parsed.x, y = context.parsed.y;
+                            return `ze: ${x.toFixed(2)}, Ps: ${y.toFixed(2)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'logarithmic',
+                    min: 0.01,
+                    max: 100,
+                    title: { display: true, text: 'Scaled Distance (ze)', font: {size: 12} },
+                    grid: { display: true }
+                },
+                y: {
+                    type: 'logarithmic',
+                    min: 0.01,
+                    max: 10000,
+                    title: { display: true, text: 'Scaled Overpressure (Ps)', font: {size: 12} },
+                    grid: { display: true }
+                }
+            }
+        }
+    });
+}
+</script>
+</body>
+</html>
