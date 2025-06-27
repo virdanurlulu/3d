@@ -346,12 +346,54 @@
     document.getElementById('distance').value = 450;
     recalc();
   </script>
-    <form method="post">
-    <textarea name="question" rows="4" cols="50" placeholder="Masukkan pertanyaan..."></textarea><br>
+
+  <!doctype html>
+<html>
+<head>
+  <title>AI Analisa Probit</title>
+  <style>
+    textarea {width: 100%; min-height: 60px;}
+    #solusi {background: #eef; padding: 10px; margin-top: 10px;}
+  </style>
+</head>
+<body>
+
+  <h2>Probit Analyzer</h2>
+  <form id="analyzeForm">
+    <label>Paste Data Probit Analysis (atau pertanyaan):</label><br>
+    <textarea id="question"></textarea><br>
     <button type="submit">Analisa!</button>
   </form>
   <h3>Solusi:</h3>
-  <div>{{ solution }}</div>
+  <div id="solusi"></div>
+
+  <h2>Probit Analyzer</h2>
+  <form id="analyzeForm">
+    <label>Paste Data Probit Analysis (atau pertanyaan):</label><br>
+    <textarea id="question"></textarea><br>
+    <button type="submit">Analisa!</button>
+  </form>
+  <h3>Solusi:</h3>
+  <div id="solusi"></div>
+
+  <script>
+    document.getElementById("analyzeForm").onsubmit = async function(e) {
+      e.preventDefault();
+      const question = document.getElementById("question").value;
+      document.getElementById("solusi").innerText = "Memproses...";
+      const resp = await fetch("https://NAMA-BACKEND-ANDA.onrender.com/analyze", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({question})
+      });
+      const data = await resp.json();
+      document.getElementById("solusi").innerText = data.solution;
+    };
+  </script>
+  
+</body>
+</html>
+
 
 </body>
 </html>
